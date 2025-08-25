@@ -28,3 +28,9 @@ go run github.com/steebchen/prisma-client-go generate
 ```bash
 go run github.com/steebchen/prisma-client-go generate
 ```
+
+## Something I learned
+
+Functions and Methods are different in Go! 
+Functions - Those that are not associated with a type
+Methods - Those that are associated with a type.
