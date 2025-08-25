@@ -1,2 +1,4 @@
 tempo
 .DS_Store
+.env
+.env.local

@@ -16,3 +16,15 @@ docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres:15
 ```
 
 ## Create the main.go file
+
+## Run prisma generate 
+
+```bash
+go run github.com/steebchen/prisma-client-go generate
+```
+
+## Database synchronisation
+
+```bash
+go run github.com/steebchen/prisma-client-go generate
+```
