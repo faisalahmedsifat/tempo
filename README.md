@@ -1,360 +1,330 @@
-# Tempo
+# Tempo - Webhook Scheduler
 
-A simple, reliable webhook scheduler built with Go. Schedule HTTP requests to run on recurring intervals using cron expressions with built-in error handling and logging.
+A lightweight, command-line webhook scheduler that allows you to schedule HTTP requests to webhooks at specified intervals using cron expressions.
 
-## Overview
+## Features
 
-Tempo is a lightweight webhook scheduler that allows you to schedule HTTP GET and POST requests to any endpoint using cron expressions. Perfect for periodic API calls, health checks, data synchronization, and automated notifications.
+- **Simple CLI Interface**: Easy-to-use commands for managing webhook jobs
+- **Persistent Storage**: Jobs are saved to JSON files and survive restarts
+- **Cron Scheduling**: Support for standard cron expressions
+- **Multiple HTTP Methods**: GET, POST, PUT, DELETE support
+- **Custom Headers & Body**: Full control over request configuration
+- **Real-time Testing**: Test webhooks immediately with `tempo run`
+- **Import/Export**: Backup and restore job configurations
+- **Interactive Mode**: Guided setup for complex webhooks
 
-### Key Features
+## Installation
 
-- **Cron-based Scheduling** - Uses standard cron expressions with second-level precision
-- **HTTP Method Support** - GET and POST requests with custom headers and body
-- **Error Handling** - Comprehensive error handling with custom error types
-- **Real-time Logging** - Detailed execution logs with success/failure status
-- **Graceful Shutdown** - Clean shutdown with signal handling
-- **Simple Architecture** - Clean, maintainable code structure
-
-## Quick Start
-
-### Installation
+### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/faisalahmedsifat/tempo.git
+git clone <repository-url>
 cd tempo
 
-# Install dependencies
-go mod download
+# Build the CLI
+go build -o tempo cmd/cli/main.go
 
-# Run the scheduler
-go run cmd/main.go
+# Install globally (optional)
+go install ./cmd/cli
 ```
+
+## Quick Start
+
+### 1. Add Your First Job
+
+```bash
+# Simple GET request every 30 seconds
+tempo add health-check --url "https://api.example.com/health" --schedule "*/30 * * * * *"
+
+# POST request with JSON body
+tempo add weekly-report \
+  --url "https://api.example.com/reports" \
+  --method POST \
+  --schedule "0 0 9 * * 1" \
+  --header "Content-Type=application/json" \
+  --body '{"template": "weekly_metrics"}'
+```
+
+### 2. List Your Jobs
+
+```bash
+tempo list
+```
+
+### 3. Test a Job
+
+```bash
+# Test a saved job
+tempo run health-check
+
+# Test a one-off webhook
+tempo run --url "https://httpbin.org/get" --method GET
+```
+
+### 4. Start the Scheduler
+
+```bash
+# Run in foreground (see logs in real-time)
+tempo start --foreground
+
+# Run in background
+tempo start
+```
+
+## CLI Commands
+
+### `tempo add [job-id]`
+
+Add a new webhook job to the scheduler.
+
+**Flags:**
+- `--url, -u`: Webhook URL (required)
+- `--method, -m`: HTTP method (GET, POST, PUT, DELETE) [default: GET]
+- `--schedule, -s`: Cron schedule expression (required)
+- `--body, -b`: Request body
+- `--header, -H`: HTTP headers (format: 'Key=Value')
+- `--interactive, -i`: Interactive mode for guided setup
+
+**Examples:**
+```bash
+# Simple health check
+tempo add health-check --url "https://api.example.com/health" --schedule "*/30 * * * * *"
+
+# Complex webhook with headers and body
+tempo add slack-notify \
+  --url "https://hooks.slack.com/services/xxx/yyy/zzz" \
+  --method POST \
+  --schedule "0 9 * * 1-5" \
+  --header "Content-Type=application/json" \
+  --body '{"text": "Daily reminder!"}'
+
+# Interactive mode
+tempo add --interactive
+```
+
+### `tempo list`
+
+List all configured jobs.
+
+**Flags:**
+- `--verbose, -v`: Show detailed job information
+
+**Example:**
+```bash
+tempo list --verbose
+```
+
+### `tempo run [job-id]`
+
+Execute a webhook job immediately for testing.
+
+**Flags:**
+- `--url, -u`: Webhook URL (for one-off execution)
+- `--method, -m`: HTTP method [default: GET]
+- `--body, -b`: Request body
+- `--header, -H`: HTTP headers (format: 'Key=Value')
+
+**Examples:**
+```bash
+# Run a saved job
+tempo run health-check
+
+# Test a one-off webhook
+tempo run --url "https://httpbin.org/post" --method POST --body '{"test": "data"}'
+```
+
+### `tempo start`
+
+Start the webhook scheduler.
+
+**Flags:**
+- `--foreground, -f`: Run in foreground mode (default)
+
+**Example:**
+```bash
+tempo start --foreground
+```
+
+### `tempo logs [job-id]`
+
+View execution logs for webhook jobs.
+
+**Flags:**
+- `--follow, -f`: Follow logs in real-time
+- `--since, -s`: Show logs since time (e.g., '1h', '30m', '2024-01-01')
+- `--limit, -n`: Number of log entries to show [default: 50]
+
+**Examples:**
+```bash
+tempo logs
+tempo logs health-check --follow
+tempo logs --since "1h"
+```
+
+### `tempo remove [job-id]`
+
+Remove a webhook job from the scheduler.
+
+**Flags:**
+- `--all, -a`: Remove all jobs
+
+**Examples:**
+```bash
+tempo remove health-check
+tempo remove --all
+```
+
+### `tempo export [filename]`
+
+Export job configurations to a file.
+
+**Flags:**
+- `--format, -f`: Export format (json, yaml) [default: json]
+
+**Examples:**
+```bash
+tempo export
+tempo export backup.json
+tempo export --format yaml jobs.yaml
+```
+
+### `tempo import [filename]`
+
+Import job configurations from a file.
+
+**Flags:**
+- `--format, -f`: Import format (json, yaml) [default: json]
+
+**Examples:**
+```bash
+tempo import backup.json
+tempo import --format yaml jobs.yaml
+```
+
+## Cron Schedule Format
+
+Tempo uses the standard cron format with seconds precision:
+
+```
+┌───────────── second (0 - 59)
+│ ┌───────────── minute (0 - 59)
+│ │ ┌───────────── hour (0 - 23)
+│ │ │ ┌───────────── day of the month (1 - 31)
+│ │ │ │ ┌───────────── month (1 - 12)
+│ │ │ │ │ ┌───────────── day of the week (0 - 6) (Sunday to Saturday)
+│ │ │ │ │ │
+* * * * * *
+```
+
+**Common Examples:**
+- `*/30 * * * * *` - Every 30 seconds
+- `0 */5 * * * *` - Every 5 minutes
+- `0 0 * * * *` - Every hour
+- `0 0 9 * * 1-5` - Weekdays at 9 AM
+- `0 0 0 1 * *` - First day of every month
+
+## Real-World Examples
+
+### DevOps Health Monitoring
+
+```bash
+# Add health checks for multiple services
+tempo add user-service-health \
+  --url "https://user-api.company.com/health" \
+  --schedule "*/30 * * * * *"
+
+tempo add payment-service-health \
+  --url "https://payment-api.company.com/health" \
+  --schedule "*/30 * * * * *"
+
+# Start scheduler
+tempo start --foreground
+
+# Monitor in real-time
+tempo logs --follow
+```
+
+### Weekly Reports
+
+```bash
+# Interactive setup for complex webhook
+tempo add --interactive
+# Job ID: investor-report
+# Webhook URL: https://api.company.com/reports/weekly
+# HTTP Method [GET]: POST
+# Cron Schedule: 0 0 9 * * 1
+# Header: Authorization=Bearer abc123
+# Header: Content-Type=application/json
+# Request Body: {"template": "weekly_metrics", "recipients": ["investor@vc.com"]}
+
+# Test the webhook immediately
+tempo run investor-report
+
+# View execution history
+tempo logs investor-report
+```
+
+### E-commerce Inventory Sync
+
+```bash
+# Add inventory sync job
+tempo add inventory-sync \
+  --url "https://warehouse-api.company.com/sync" \
+  --method POST \
+  --schedule "0 */15 * * * *" \
+  --header "API-Key=warehouse_123" \
+  --header "Content-Type=application/json" \
+  --body '{"source": "shopify", "target": "warehouse"}'
+
+# Pause during maintenance
+tempo remove inventory-sync
+
+# Resume after maintenance  
+tempo add inventory-sync \
+  --url "https://warehouse-api.company.com/sync" \
+  --method POST \
+  --schedule "0 */15 * * * *" \
+  --header "API-Key=warehouse_123" \
+  --header "Content-Type=application/json" \
+  --body '{"source": "shopify", "target": "warehouse"}'
+
+# Export configuration for backup
+tempo export > backup.json
+```
+
+## Configuration
+
+Jobs are stored in `~/.tempo/jobs.json` by default. You can customize the data directory by modifying the storage configuration.
+
+## Development
 
 ### Project Structure
 
 ```
 tempo/
 ├── cmd/
-│   └── main.go              # Application entry point
+│   ├── cli/           # CLI application
+│   │   ├── main.go    # CLI entry point
+│   │   └── commands/  # CLI commands
+│   └── main.go        # Original test application
 ├── internal/
-│   ├── types/
-│   │   └── job.go           # Job struct definition
-│   └── service/
-│       └── scheduler.go     # Scheduling logic and webhook execution
-├── go.mod
-└── go.sum
+│   ├── service/       # Scheduler service
+│   ├── storage/       # Job storage
+│   └── types/         # Data types
+└── README.md
 ```
 
-## Usage
+### Building
 
-### Creating Jobs
+```bash
+# Build CLI
+go build -o tempo cmd/cli/main.go
 
-Jobs are defined using the `Job` struct:
-
-```go
-job := types.Job{
-    ID:       "my-webhook",
-    URL:      "https://api.example.com/webhook",
-    Method:   "POST",
-    CronExpr: "*/30 * * * * *", // Every 30 seconds
-    Headers: map[string]string{
-        "Content-Type": "application/json",
-        "Authorization": "Bearer your-token",
-    },
-    Body: `{"message": "Hello from Tempo!"}`,
-}
+# Build original test app
+go build -o tempo-test cmd/main.go
 ```
-
-### Basic Example
-
-```go
-package main
-
-import (
-    "tempo/internal/service"
-    "tempo/internal/types"
-)
-
-func main() {
-    // Create scheduler
-    scheduler := service.NewScheduler()
-
-    // Define a job
-    job := types.Job{
-        ID:       "health-check",
-        URL:      "https://httpbin.org/get",
-        Method:   "GET",
-        CronExpr: "*/10 * * * * *", // Every 10 seconds
-    }
-
-    // Add job to scheduler
-    scheduler.AddJob(job)
-
-    // Start scheduler
-    scheduler.Start()
-
-    // Keep running (add signal handling in production)
-    select {}
-}
-```
-
-### Supported Job Types
-
-#### GET Request
-```go
-job := types.Job{
-    ID:       "api-health-check",
-    URL:      "https://api.example.com/health",
-    Method:   "GET",
-    CronExpr: "0 */5 * * * *", // Every 5 minutes
-    Headers: map[string]string{
-        "User-Agent": "Tempo-Scheduler/1.0",
-    },
-}
-```
-
-#### POST Request with JSON
-```go
-job := types.Job{
-    ID:       "slack-notification",
-    URL:      "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
-    Method:   "POST",
-    CronExpr: "0 0 9 * * 1-5", // Weekdays at 9 AM
-    Headers: map[string]string{
-        "Content-Type": "application/json",
-    },
-    Body: `{
-        "text": "Good morning! Daily standup reminder.",
-        "channel": "#general"
-    }`,
-}
-```
-
-#### POST Request with Form Data
-```go
-job := types.Job{
-    ID:       "form-submission",
-    URL:      "https://api.example.com/submit",
-    Method:   "POST",
-    CronExpr: "0 0 * * * *", // Every hour
-    Headers: map[string]string{
-        "Content-Type": "application/x-www-form-urlencoded",
-    },
-    Body: "key1=value1&key2=value2",
-}
-```
-
-## Cron Expression Format
-
-Tempo supports 6-field cron expressions with second precision:
-
-```
-┌───────────── second (0-59)
-│ ┌───────────── minute (0-59)
-│ │ ┌───────────── hour (0-23)
-│ │ │ ┌───────────── day of month (1-31)
-│ │ │ │ ┌───────────── month (1-12)
-│ │ │ │ │ ┌───────────── day of week (0-6, 0=Sunday)
-│ │ │ │ │ │
-* * * * * *
-```
-
-### Common Patterns
-
-| Expression | Description |
-|------------|-------------|
-| `*/10 * * * * *` | Every 10 seconds |
-| `0 */5 * * * *` | Every 5 minutes |
-| `0 0 * * * *` | Every hour |
-| `0 0 9 * * *` | Every day at 9 AM |
-| `0 0 9 * * 1-5` | Weekdays at 9 AM |
-| `0 0 0 1 * *` | First day of every month |
-| `0 30 14 * * 6` | Every Saturday at 2:30 PM |
-
-## API Reference
-
-### Types
-
-#### Job
-```go
-type Job struct {
-    ID       string            `json:"id"`       // Unique identifier
-    URL      string            `json:"url"`      // Target webhook URL
-    CronExpr string            `json:"cron_expr"` // Cron expression
-    Method   string            `json:"method"`   // HTTP method (GET/POST)
-    Headers  map[string]string `json:"headers"`  // HTTP headers
-    Body     string            `json:"body"`     // Request body (for POST)
-}
-```
-
-### Scheduler Methods
-
-#### NewScheduler()
-Creates a new scheduler instance.
-
-```go
-scheduler := service.NewScheduler()
-```
-
-#### AddJob(job Job)
-Adds a job to the scheduler.
-
-```go
-scheduler.AddJob(job)
-```
-
-#### Start()
-Starts the scheduler and begins executing jobs.
-
-```go
-scheduler.Start()
-```
-
-#### Stop()
-Gracefully stops the scheduler.
-
-```go
-scheduler.Stop()
-```
-
-## Error Handling
-
-Tempo includes comprehensive error handling:
-
-### WebhookError
-Custom error type for webhook-specific failures:
-
-```go
-type WebhookError struct {
-    StatusCode int    // HTTP status code
-    Message    string // Error message
-}
-```
-
-### Error Scenarios
-
-- **Network errors**: Connection timeouts, DNS failures
-- **HTTP errors**: 4xx and 5xx status codes
-- **Scheduling errors**: Invalid cron expressions
-- **Request errors**: Invalid URLs, malformed requests
-
-## Logging
-
-Tempo provides detailed logging for monitoring and debugging:
-
-```
-Calling webhook: POST https://api.example.com/webhook
-[INFO] Job slack-notification executed successfully
-
-Calling webhook: GET https://api.invalid.com/endpoint
-Error calling webhook: no such host
-[ERROR] Job health-check failed: webhook returned status code: 500, message: Internal server error
-```
-
-## Testing
-
-### Test with Online Services
-
-```go
-// Test with httpbin.org
-jobs := []types.Job{
-    {
-        ID:       "test-get",
-        URL:      "https://httpbin.org/get",
-        Method:   "GET",
-        CronExpr: "*/5 * * * * *",
-    },
-    {
-        ID:       "test-post",
-        URL:      "https://httpbin.org/post",
-        Method:   "POST",
-        CronExpr: "*/10 * * * * *",
-        Body:     `{"test": "data"}`,
-    },
-}
-```
-
-### Create a Test Webhook
-
-Use [webhook.site](https://webhook.site) to create a test endpoint and monitor incoming requests.
-
-## Development
-
-### Prerequisites
-
-- Go 1.21 or higher
-- Git
-
-### Setup
-
-1. Fork and clone the repository
-2. Install dependencies: `go mod download`
-3. Make your changes
-4. Test your changes: `go run cmd/main.go`
-5. Submit a pull request
-
-### Code Structure
-
-- **`internal/types/`**: Data structures and types
-- **`internal/service/`**: Business logic and scheduling
-- **`cmd/`**: Application entry points
-
-## Configuration
-
-### Environment Variables
-
-Currently, all configuration is done through code. Future versions may support:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TEMPO_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
-| `TEMPO_TIMEOUT` | HTTP request timeout | `10s` |
-| `TEMPO_MAX_RETRIES` | Maximum retry attempts | `3` |
-
-## Limitations
-
-- Jobs are defined in code and require restart to modify
-- No persistence layer (jobs don't survive restarts)
-- No web interface or API for job management
-- Limited to GET and POST HTTP methods
-- No job dependencies or complex workflows
-
-## Roadmap
-
-- [ ] REST API for job management
-- [ ] Web dashboard
-- [ ] Job persistence (database storage)
-- [ ] More HTTP methods (PUT, DELETE, PATCH)
-- [ ] Retry logic with exponential backoff
-- [ ] Job execution history
-- [ ] Metrics and monitoring
-- [ ] Configuration file support
-- [ ] Job templates and bulk operations
-- [ ] Authentication and authorization
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Dependencies
-
-- [robfig/cron](https://github.com/robfig/cron) - Cron expression parsing and scheduling
-
-## Acknowledgments
-
-- Inspired by the need for simple, reliable webhook scheduling
-- Built with Go's excellent standard library
-- Thanks to the robfig/cron library for robust cron expression support
-
----
-
-*Simple. Reliable. Efficient. Never miss a scheduled webhook again.*
+MIT License - see LICENSE file for details.
