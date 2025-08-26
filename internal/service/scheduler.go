@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"tempo/internal/types"
 	"time"
@@ -62,31 +63,51 @@ func NewScheduler() *Scheduler {
 * CallWebhook calls the webhook
 * It calls the webhook and returns an error if the webhook returns a status code >= 400
  */
-func CallWebhook(url string) error {
-	log.Printf("Calling webhook: %v", url)
+func CallWebhook(job types.Job) error {
+	log.Printf("Calling webhook: %v, method: %v, body: %v, headers: %v", job.URL, job.Method, job.Body, job.Headers)
 
+	// create a new http client
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
-	resp, err := client.Get(url)
-
+	// create request with body, method and headers
+	req, err := http.NewRequest(job.Method, job.URL, strings.NewReader(job.Body))
 	if err != nil {
-		log.Printf("Error calling webhook: %v", err)
+		log.Printf("Error creating request: %v", err)
 		return &WebhookError{
 			StatusCode: 500,
-			Message:    "Internal server error",
+			Message:    "Error creating request",
+		}
+	}
+
+	// add headers to request
+	for key, value := range job.Headers {
+		req.Header.Add(key, value)
+	}
+
+	// send request
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error sending request: %v", err)
+		return &WebhookError{
+			StatusCode: 500,
+			Message:    "Error sending request",
 		}
 	}
 
 	defer resp.Body.Close()
 
+	// check if status code is >= 400
 	if resp.StatusCode >= 400 {
 		return &WebhookError{
 			StatusCode: resp.StatusCode,
 			Message:    resp.Status,
 		}
 	}
+
+	// log response
+	log.Printf("Response: %v", resp)
 
 	return nil
 }
@@ -98,7 +119,7 @@ func CallWebhook(url string) error {
  */
 func (s *Scheduler) AddJob(job types.Job) {
 	_, err := s.Cron.AddFunc(job.CronExpr, func() {
-		err := CallWebhook(job.URL)
+		err := CallWebhook(job)
 
 		if err != nil {
 			log.Printf("Error calling webhook: %v", err)

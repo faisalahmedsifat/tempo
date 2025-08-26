@@ -1,302 +1,339 @@
 # Tempo
 
-A modern, reliable webhook scheduler that eliminates the need for managing cron job infrastructure. Schedule any HTTP endpoint to run on a recurring basis with built-in monitoring, retries, and alerts.
+A simple, reliable webhook scheduler built with Go. Schedule HTTP requests to run on recurring intervals using cron expressions with built-in error handling and logging.
 
 ## Overview
 
-Tempo provides a simple API and dashboard for scheduling webhooks (HTTP requests) to run at specified intervals. Instead of managing servers, crontabs, or complex orchestration tools, developers can schedule jobs in seconds and monitor their execution through a clean interface.
+Tempo is a lightweight webhook scheduler that allows you to schedule HTTP GET and POST requests to any endpoint using cron expressions. Perfect for periodic API calls, health checks, data synchronization, and automated notifications.
 
 ### Key Features
 
-- **Simple Scheduling** - Natural language scheduling or cron expressions
-- **Reliable Execution** - 99.99% scheduling accuracy with automatic retries
-- **Complete Visibility** - Dashboard showing execution history, logs, and metrics
-- **Flexible Webhooks** - Support for any HTTP method, headers, and request bodies
-- **Smart Alerts** - Get notified only when things actually need attention
-- **Developer Friendly** - REST API, CLI, and SDKs for popular languages
+- **Cron-based Scheduling** - Uses standard cron expressions with second-level precision
+- **HTTP Method Support** - GET and POST requests with custom headers and body
+- **Error Handling** - Comprehensive error handling with custom error types
+- **Real-time Logging** - Detailed execution logs with success/failure status
+- **Graceful Shutdown** - Clean shutdown with signal handling
+- **Simple Architecture** - Clean, maintainable code structure
 
 ## Quick Start
 
 ### Installation
 
 ```bash
-# Using Docker
-docker-compose up
+# Clone the repository
+git clone https://github.com/faisalahmedsifat/tempo.git
+cd tempo
 
-# Or run locally
+# Install dependencies
 go mod download
-go run github.com/steebchen/prisma-client-go generate
-npx prisma migrate dev
-go run cmd/server/main.go
+
+# Run the scheduler
+go run cmd/main.go
 ```
 
-### Basic Usage
-
-#### Via CLI
-
-```bash
-# Install CLI
-npm install -g @tempo/cli
-
-# Schedule a webhook
-tempo schedule "daily-backup" \
-  --url "https://api.example.com/backup" \
-  --schedule "every day at 2am"
-
-# List all jobs
-tempo list
-# View execution history
-tempo logs daily-backup
-```
-
-#### Via API
-
-```bash
-# Create a job
-curl -X POST https://api.tempo.dev/v1/jobs \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "sync-data",
-    "url": "https://api.example.com/sync",
-    "schedule": "every hour",
-    "method": "POST",
-    "headers": {
-      "Authorization": "Bearer token"
-    }
-  }'
-```
-
-#### Via SDK
-
-```javascript
-// JavaScript/TypeScript
-import { Tempo } from '@tempo/sdk';
-
-const tempo = new Tempo({ apiKey: 'tmp_xxx' });
-
-await tempo.jobs.create({
-  name: 'daily-report',
-  url: 'https://api.example.com/reports/daily',
-  schedule: 'every day at 9am',
-  retries: 3,
-  timeout: '5m'
-});
-```
-
-## Architecture
-
-Tempo is built with a clean, domain-driven architecture:
+### Project Structure
 
 ```
 tempo/
-├── cmd/server/          # Application entry point
+├── cmd/
+│   └── main.go              # Application entry point
 ├── internal/
-│   ├── domain/          # Core business entities
-│   ├── service/         # Business logic
-│   ├── repository/      # Data access layer
-│   ├── handler/         # HTTP handlers
-│   └── infrastructure/  # External services
-├── prisma/              # Database schema
-└── pkg/                 # Shared utilities
+│   ├── types/
+│   │   └── job.go           # Job struct definition
+│   └── service/
+│       └── scheduler.go     # Scheduling logic and webhook execution
+├── go.mod
+└── go.sum
 ```
 
-### Technology Stack
+## Usage
 
-- **Backend**: Go with Fiber framework
-- **Database**: PostgreSQL with Prisma ORM
-- **Queue**: Redis with Asynq
-- **Scheduling**: Cron expression parser with distributed locking
-- **API**: RESTful with OpenAPI specification
+### Creating Jobs
 
-## API Reference
+Jobs are defined using the `Job` struct:
 
-### Authentication
-
-All API requests require an API key in the Authorization header:
-
-```bash
-Authorization: Bearer YOUR_API_KEY
-```
-
-### Endpoints
-
-#### Create Job
-`POST /api/v1/jobs`
-
-```json
-{
-  "name": "job-name",
-  "url": "https://webhook.url",
-  "schedule": "every hour",
-  "method": "POST",
-  "headers": {},
-  "body": "{}",
-  "max_retries": 3,
-  "timeout_seconds": 30
+```go
+job := types.Job{
+    ID:       "my-webhook",
+    URL:      "https://api.example.com/webhook",
+    Method:   "POST",
+    CronExpr: "*/30 * * * * *", // Every 30 seconds
+    Headers: map[string]string{
+        "Content-Type": "application/json",
+        "Authorization": "Bearer your-token",
+    },
+    Body: `{"message": "Hello from Tempo!"}`,
 }
 ```
 
-#### List Jobs
-`GET /api/v1/jobs?limit=20&offset=0`
+### Basic Example
 
-#### Get Job
-`GET /api/v1/jobs/:id`
+```go
+package main
 
-#### Update Job
-`PUT /api/v1/jobs/:id`
+import (
+    "tempo/internal/service"
+    "tempo/internal/types"
+)
 
-#### Delete Job
-`DELETE /api/v1/jobs/:id`
+func main() {
+    // Create scheduler
+    scheduler := service.NewScheduler()
 
-#### Run Job Immediately
-`POST /api/v1/jobs/:id/run`
+    // Define a job
+    job := types.Job{
+        ID:       "health-check",
+        URL:      "https://httpbin.org/get",
+        Method:   "GET",
+        CronExpr: "*/10 * * * * *", // Every 10 seconds
+    }
 
-#### Get Execution History
-`GET /api/v1/jobs/:id/executions`
+    // Add job to scheduler
+    scheduler.AddJob(job)
 
-### Schedule Formats
+    // Start scheduler
+    scheduler.Start()
 
-Tempo accepts both natural language and cron expressions:
+    // Keep running (add signal handling in production)
+    select {}
+}
+```
 
-#### Natural Language
-- `every minute`
-- `every 5 minutes`
-- `every hour`
-- `every day at 9am`
-- `every monday at 2pm`
-- `every first friday of month`
+### Supported Job Types
 
-#### Cron Expressions
-- `* * * * *` - Every minute
-- `0 * * * *` - Every hour
-- `0 9 * * 1-5` - Weekdays at 9am
-- `0 0 1 * *` - First day of month
+#### GET Request
+```go
+job := types.Job{
+    ID:       "api-health-check",
+    URL:      "https://api.example.com/health",
+    Method:   "GET",
+    CronExpr: "0 */5 * * * *", // Every 5 minutes
+    Headers: map[string]string{
+        "User-Agent": "Tempo-Scheduler/1.0",
+    },
+}
+```
+
+#### POST Request with JSON
+```go
+job := types.Job{
+    ID:       "slack-notification",
+    URL:      "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+    Method:   "POST",
+    CronExpr: "0 0 9 * * 1-5", // Weekdays at 9 AM
+    Headers: map[string]string{
+        "Content-Type": "application/json",
+    },
+    Body: `{
+        "text": "Good morning! Daily standup reminder.",
+        "channel": "#general"
+    }`,
+}
+```
+
+#### POST Request with Form Data
+```go
+job := types.Job{
+    ID:       "form-submission",
+    URL:      "https://api.example.com/submit",
+    Method:   "POST",
+    CronExpr: "0 0 * * * *", // Every hour
+    Headers: map[string]string{
+        "Content-Type": "application/x-www-form-urlencoded",
+    },
+    Body: "key1=value1&key2=value2",
+}
+```
+
+## Cron Expression Format
+
+Tempo supports 6-field cron expressions with second precision:
+
+```
+┌───────────── second (0-59)
+│ ┌───────────── minute (0-59)
+│ │ ┌───────────── hour (0-23)
+│ │ │ ┌───────────── day of month (1-31)
+│ │ │ │ ┌───────────── month (1-12)
+│ │ │ │ │ ┌───────────── day of week (0-6, 0=Sunday)
+│ │ │ │ │ │
+* * * * * *
+```
+
+### Common Patterns
+
+| Expression | Description |
+|------------|-------------|
+| `*/10 * * * * *` | Every 10 seconds |
+| `0 */5 * * * *` | Every 5 minutes |
+| `0 0 * * * *` | Every hour |
+| `0 0 9 * * *` | Every day at 9 AM |
+| `0 0 9 * * 1-5` | Weekdays at 9 AM |
+| `0 0 0 1 * *` | First day of every month |
+| `0 30 14 * * 6` | Every Saturday at 2:30 PM |
+
+## API Reference
+
+### Types
+
+#### Job
+```go
+type Job struct {
+    ID       string            `json:"id"`       // Unique identifier
+    URL      string            `json:"url"`      // Target webhook URL
+    CronExpr string            `json:"cron_expr"` // Cron expression
+    Method   string            `json:"method"`   // HTTP method (GET/POST)
+    Headers  map[string]string `json:"headers"`  // HTTP headers
+    Body     string            `json:"body"`     // Request body (for POST)
+}
+```
+
+### Scheduler Methods
+
+#### NewScheduler()
+Creates a new scheduler instance.
+
+```go
+scheduler := service.NewScheduler()
+```
+
+#### AddJob(job Job)
+Adds a job to the scheduler.
+
+```go
+scheduler.AddJob(job)
+```
+
+#### Start()
+Starts the scheduler and begins executing jobs.
+
+```go
+scheduler.Start()
+```
+
+#### Stop()
+Gracefully stops the scheduler.
+
+```go
+scheduler.Stop()
+```
+
+## Error Handling
+
+Tempo includes comprehensive error handling:
+
+### WebhookError
+Custom error type for webhook-specific failures:
+
+```go
+type WebhookError struct {
+    StatusCode int    // HTTP status code
+    Message    string // Error message
+}
+```
+
+### Error Scenarios
+
+- **Network errors**: Connection timeouts, DNS failures
+- **HTTP errors**: 4xx and 5xx status codes
+- **Scheduling errors**: Invalid cron expressions
+- **Request errors**: Invalid URLs, malformed requests
+
+## Logging
+
+Tempo provides detailed logging for monitoring and debugging:
+
+```
+Calling webhook: POST https://api.example.com/webhook
+[INFO] Job slack-notification executed successfully
+
+Calling webhook: GET https://api.invalid.com/endpoint
+Error calling webhook: no such host
+[ERROR] Job health-check failed: webhook returned status code: 500, message: Internal server error
+```
+
+## Testing
+
+### Test with Online Services
+
+```go
+// Test with httpbin.org
+jobs := []types.Job{
+    {
+        ID:       "test-get",
+        URL:      "https://httpbin.org/get",
+        Method:   "GET",
+        CronExpr: "*/5 * * * * *",
+    },
+    {
+        ID:       "test-post",
+        URL:      "https://httpbin.org/post",
+        Method:   "POST",
+        CronExpr: "*/10 * * * * *",
+        Body:     `{"test": "data"}`,
+    },
+}
+```
+
+### Create a Test Webhook
+
+Use [webhook.site](https://webhook.site) to create a test endpoint and monitor incoming requests.
 
 ## Development
 
 ### Prerequisites
 
-- Go 1.21+
-- PostgreSQL 15+
-- Redis 7+
-- Node.js 18+ (for Prisma CLI)
+- Go 1.21 or higher
+- Git
 
 ### Setup
 
-1. Clone the repository
-```bash
-git clone https://github.com/faisalahmedsiifat/tempo.git
-cd tempo
-```
+1. Fork and clone the repository
+2. Install dependencies: `go mod download`
+3. Make your changes
+4. Test your changes: `go run cmd/main.go`
+5. Submit a pull request
 
-2. Install dependencies
-```bash
-go mod download
-npm install
-```
+### Code Structure
 
-3. Set up environment variables
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-4. Run database migrations
-```bash
-npx prisma migrate dev
-```
-
-5. Generate Prisma client
-```bash
-go run github.com/steebchen/prisma-client-go generate
-```
-
-6. Start the server
-```bash
-go run cmd/server/main.go
-```
-
-### Testing
-
-```bash
-# Run all tests
-go test ./...
-
-# Run with coverage
-go test -cover ./...
-
-# Run specific package tests
-go test ./internal/service/...
-```
-
-### Building
-
-```bash
-# Build binary
-go build -o bin/tempo cmd/server/main.go
-
-# Build Docker image
-docker build -t tempo:latest .
-
-# Build with version info
-go build -ldflags "-X main.Version=1.0.0" -o bin/tempo cmd/server/main.go
-```
-
-## Deployment
-
-### Using Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-### Using Kubernetes
-
-```bash
-kubectl apply -f k8s/
-```
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `8080` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://localhost/tempo` |
-| `REDIS_URL` | Redis connection string | `localhost:6379` |
-| `SECRET_KEY` | JWT signing key | - |
-| `ENVIRONMENT` | Environment (development/production) | `development` |
+- **`internal/types/`**: Data structures and types
+- **`internal/service/`**: Business logic and scheduling
+- **`cmd/`**: Application entry points
 
 ## Configuration
 
-### Rate Limits
+### Environment Variables
 
-Default rate limits per API key:
-- 1000 requests per hour
-- 100 concurrent jobs
-- 10,000 executions per day
+Currently, all configuration is done through code. Future versions may support:
 
-### Retention
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TEMPO_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
+| `TEMPO_TIMEOUT` | HTTP request timeout | `10s` |
+| `TEMPO_MAX_RETRIES` | Maximum retry attempts | `3` |
 
-- Execution logs: 30 days (free), 90 days (paid)
-- Metrics: 90 days
-- Failed job details: 7 days
+## Limitations
 
-## Monitoring
+- Jobs are defined in code and require restart to modify
+- No persistence layer (jobs don't survive restarts)
+- No web interface or API for job management
+- Limited to GET and POST HTTP methods
+- No job dependencies or complex workflows
 
-Tempo exposes Prometheus metrics at `/metrics`:
+## Roadmap
 
-- `tempo_jobs_total` - Total number of jobs
-- `tempo_executions_total` - Total executions by status
-- `tempo_execution_duration_seconds` - Execution duration histogram
-- `tempo_webhook_response_time_seconds` - Webhook response times
-- `tempo_scheduler_lag_seconds` - Scheduling delay
+- [ ] REST API for job management
+- [ ] Web dashboard
+- [ ] Job persistence (database storage)
+- [ ] More HTTP methods (PUT, DELETE, PATCH)
+- [ ] Retry logic with exponential backoff
+- [ ] Job execution history
+- [ ] Metrics and monitoring
+- [ ] Configuration file support
+- [ ] Job templates and bulk operations
+- [ ] Authentication and authorization
 
 ## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-### Development Workflow
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -304,43 +341,20 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Code Style
-
-- Run `go fmt` before committing
-- Follow [Effective Go](https://golang.org/doc/effective_go.html) guidelines
-- Add tests for new features
-- Update documentation as needed
-
-## Roadmap
-
-- [ ] Workflow orchestration (job dependencies)
-- [ ] Event-driven triggers
-- [ ] Webhook request/response transformations
-- [ ] Team collaboration features
-- [ ] Advanced scheduling (timezone-aware, holidays)
-- [ ] Webhook authentication methods (OAuth, mTLS)
-- [ ] Bulk operations API
-- [ ] Terraform provider
-- [ ] Grafana dashboard templates
-
-## Support
-
-- **Documentation**: [docs.tempo.dev](https://docs.tempo.dev)
-- **Issues**: [GitHub Issues](https://github.com/faisalahmedsiifat/tempo/issues)
-- **Discord**: [Join our community](https://discord.gg/tempo)
-- **Email**: support@tempo.dev
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Dependencies
+
+- [robfig/cron](https://github.com/robfig/cron) - Cron expression parsing and scheduling
+
 ## Acknowledgments
 
-- [Asynq](https://github.com/hibiken/asynq) for reliable task processing
-- [Fiber](https://github.com/gofiber/fiber) for fast HTTP handling
-- [Prisma](https://www.prisma.io/) for type-safe database access
-- [Robfig/cron](https://github.com/robfig/cron) for cron expression parsing
+- Inspired by the need for simple, reliable webhook scheduling
+- Built with Go's excellent standard library
+- Thanks to the robfig/cron library for robust cron expression support
 
 ---
 
-Built with precision scheduling in mind. Never miss a webhook again.
+*Simple. Reliable. Efficient. Never miss a scheduled webhook again.*

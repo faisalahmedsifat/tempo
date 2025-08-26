@@ -1,16 +1,13 @@
 ## Name of the project
 PROJECT_NAME = tempo
 
-## Go build flags
-GO_BUILD_FLAGS = -v -o $(PROJECT_NAME)
-
 ## Run the project
 run:
-	go run main.go
+	go run cmd/main.go
 
 ## Build the project
 build:
-	go build $(GO_BUILD_FLAGS)
+	go build -o $(PROJECT_NAME) cmd/main.go
 
 
 ## Clean the project
