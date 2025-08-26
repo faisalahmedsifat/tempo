@@ -29,6 +29,8 @@ go build -o tempo cmd/cli/main.go
 go install ./cmd/cli
 ```
 
+Or, use the provided `Makefile` to build the CLI:
+
 ## Quick Start
 
 ### 1. Add Your First Job
